@@ -1,8 +1,8 @@
 package errors
 
 import (
-	"errors"
 	"fmt"
+	"github.com/pkg/errors"
 )
 
 /*
@@ -45,30 +45,38 @@ func (e *Error) Cause() error {
 
 // Is matches each error in the chain with the target value.
 func (e *Error) Is(err error) bool {
-	if se := new(Error); errors.As(err, &se) {
+	if se := new(Error); As(err, &se) {
 		return se.code == e.code
 	}
 	return false
 }
 
 func New(code int, message string) *Error {
-    return &Error{
-        code: code,
-        message: message,
-    }
+	return &Error{
+		code:    code,
+		message: message,
+	}
 }
-func WithMessageOrCode(err error, message string, code ...int) *Error {
+
+func WithMessage(err error, message string, code ...int) *Error {
 	if err == nil {
 		return nil
 	}
-	if se := new(Error); errors.As(err, &se) {
-		return Wrap(err, se.code, fmt.Sprintf("%s -> %s", message, se.message))
+	if se := new(Error); As(err, &se) {
+		return withMessage(err, se.code, fmt.Sprintf("%s -> %s", message, se.message))
 	}
 	c := UnknownCode
 	if len(code) > 0 {
 		c = code[0]
 	}
-	return Wrap(err, c, message)
+	return withMessage(err, c, message)
+}
+func withMessage(err error, code int, message string) *Error {
+	return &Error{
+		code:    code,
+		message: message,
+		err:     err,
+	}
 }
 
 // New returns an error object for the code, message.
@@ -79,7 +87,7 @@ func Wrap(err error, code int, message string) *Error {
 	return &Error{
 		code:    code,
 		message: message,
-		err:     err,
+		err:     errors.Wrap(err, ""),
 	}
 }
 
@@ -89,20 +97,20 @@ func Code(err error) int {
 	if err == nil {
 		return 0
 	}
-	if se := FromError(err); err != nil {
+	if se := FormatError(err); err != nil {
 		return se.code
 	}
 	return UnknownCode
 }
 
-// FromError try to convert an error to *Error.
+// FormatError try to convert an error to *Error.
 // It supports wrapped errors.
-func FromError(err error) *Error {
+func FormatError(err error) *Error {
 	if err == nil {
 		return nil
 	}
-	if se := new(Error); errors.As(err, &se) {
+	if se := new(Error); As(err, &se) {
 		return se
 	}
-	return Wrap(err, UnknownCode, "")
+	return withMessage(err, UnknownCode, "FormatError")
 }
